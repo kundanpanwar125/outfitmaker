@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fabric Vision</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 900px;
+            padding: 1.5rem;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #4f46e5;
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 bg-gray-100">
+
+    <div class="container bg-white shadow-xl rounded-2xl overflow-hidden flex flex-col md:flex-row p-6">
+        <!-- Left Side: Inputs -->
+        <div class="w-full md:w-1/2 p-4 flex flex-col items-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">Fabric Vision</h1>
+            <p class="text-gray-600 text-center mb-6">
+                Upload a fabric image and see it transform into a final outfit design!
+            </p>
+
+            <!-- Fabric Image Upload -->
+            <div class="w-full mb-6">
+                <label for="file-upload" class="flex flex-col items-center justify-center px-6 py-4 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors duration-200">
+                    <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                    <span class="mt-2 text-base font-medium text-gray-600">Click to upload your fabric image</span>
+                </label>
+                <input id="file-upload" type="file" class="hidden" accept="image/*">
+                <div id="image-preview" class="mt-4 w-full h-48 bg-gray-200 rounded-lg overflow-hidden hidden">
+                    <img id="preview-img" src="" alt="Fabric preview" class="w-full h-full object-cover">
+                </div>
+            </div>
+
+            <!-- Outfit Selection -->
+            <div class="w-full mb-6">
+                <label for="outfit-select" class="block text-sm font-medium text-gray-700 mb-2">Select an Outfit Style:</label>
+                <select id="outfit-select" class="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="men's formal shirt">Men's Formal Shirt</option>
+                    <option value="formal trousers">Formal Trousers</option>
+                </select>
+            </div>
+
+            <!-- Generate Button -->
+            <button id="generate-btn" class="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:bg-indigo-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:bg-indigo-300" disabled>
+                Generate Outfit
+            </button>
+            <div id="loading-indicator" class="mt-4 hidden">
+                <div class="spinner"></div>
+            </div>
+            <div id="message-box" class="mt-4 p-3 w-full text-center text-sm rounded-lg text-gray-700 hidden"></div>
+        </div>
+
+        <!-- Right Side: Output -->
+        <div class="w-full md:w-1/2 p-4 flex flex-col items-center justify-center bg-gray-50 rounded-2xl">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Generated Outfit</h2>
+            <div id="output-container" class="w-full flex items-center justify-center p-4 bg-gray-200 rounded-xl h-96 overflow-hidden">
+                <img id="output-img" class="max-w-full max-h-full object-contain" src="https://placehold.co/400x400/e2e8f0/64748b?text=Your+Outfit+Will+Appear+Here" alt="Generated Outfit">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fileInput = document.getElementById('file-upload');
+            const generateBtn = document.getElementById('generate-btn');
+            const outfitSelect = document.getElementById('outfit-select');
+            const previewImg = document.getElementById('preview-img');
+            const imagePreview = document.getElementById('image-preview');
+            const outputImg = document.getElementById('output-img');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const messageBox = document.getElementById('message-box');
+
+            let uploadedImageBase64 = null;
+            let retryCount = 0;
+
+            // Handle file upload
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        uploadedImageBase64 = e.target.result.split(',')[1];
+                        previewImg.src = e.target.result;
+                        imagePreview.classList.remove('hidden');
+                        generateBtn.disabled = false;
+                        showMessage('Image uploaded successfully. Select an outfit and click Generate.', 'text-green-600');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    uploadedImageBase64 = null;
+                    imagePreview.classList.add('hidden');
+                    generateBtn.disabled = true;
+                    showMessage('Please upload a valid image file.', 'text-red-600');
+                }
+            });
+
+            // Handle generate button click
+            generateBtn.addEventListener('click', () => {
+                if (!uploadedImageBase64) {
+                    showMessage('Please upload a fabric image first.', 'text-red-600');
+                    return;
+                }
+
+                // Show loading indicator and disable button
+                loadingIndicator.classList.remove('hidden');
+                generateBtn.disabled = true;
+                outputImg.src = 'https://placehold.co/400x400/e2e8f0/64748b?text=Generating...';
+
+                const selectedOutfit = outfitSelect.value;
+                const prompt = `Take the provided fabric image and create a realistic image of a person wearing a ${selectedOutfit} made from this fabric. The fabric should cover the entire outfit and its texture and pattern should be preserved. Make sure the background is a simple solid color.`;
+
+                // API call to gemini-2.5-flash-image-preview
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: uploadedImageBase64
+                                }
+                            }
+                        ]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["TEXT", "IMAGE"]
+                    }
+                };
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+
+                const fetchWithRetry = (url, options) => {
+                    return new Promise((resolve, reject) => {
+                        const doFetch = (retryCount) => {
+                            fetch(url, options)
+                                .then(response => {
+                                    if (response.ok) {
+                                        return response.json();
+                                    } else {
+                                        // Exponential backoff
+                                        const delay = Math.pow(2, retryCount) * 1000;
+                                        if (retryCount < 3) { // Max 3 retries
+                                            setTimeout(() => doFetch(retryCount + 1), delay);
+                                        } else {
+                                            reject(new Error(`API call failed after ${retryCount} retries.`));
+                                        }
+                                    }
+                                })
+                                .then(resolve)
+                                .catch(reject);
+                        };
+                        doFetch(0);
+                    });
+                };
+
+                fetchWithRetry(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(result => {
+                    const base64Data = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                    if (base64Data) {
+                        const imageUrl = `data:image/jpeg;base64,${base64Data}`;
+                        outputImg.src = imageUrl;
+                        showMessage('Outfit generated successfully!', 'text-green-600');
+                    } else {
+                        throw new Error("Invalid response from API. Please try again.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    showMessage('Failed to generate outfit. Please try a different image or outfit style.', 'text-red-600');
+                })
+                .finally(() => {
+                    loadingIndicator.classList.add('hidden');
+                    generateBtn.disabled = false;
+                });
+            });
+
+            // Helper function to show messages
+            function showMessage(text, className) {
+                messageBox.textContent = text;
+                messageBox.className = `mt-4 p-3 w-full text-center text-sm rounded-lg ${className}`;
+                messageBox.classList.remove('hidden');
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
